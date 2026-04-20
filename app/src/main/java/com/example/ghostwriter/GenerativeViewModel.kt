@@ -99,11 +99,8 @@ class GenerativeViewModel(
     private fun getGenerativeModel(): GenerativeModel? {
         if (_apiKey.value.isBlank()) return null
         return GenerativeModel(
-            modelName = "gemini-1.5-flash",
-            apiKey = _apiKey.value,
-            generationConfig = generationConfig {
-                responseMimeType = "text/plain"
-            }
+            modelName = "gemini-1.5-flash-latest",
+            apiKey = _apiKey.value
         )
     }
 
@@ -165,7 +162,6 @@ class GenerativeViewModel(
         viewModelScope.launch {
             _uiState.value = UiState.Loading
             try {
-                chatSession = model.startChat()
                 val frameworkPrompt = when (_selectedFramework.value) {
                     ExportFramework.VANILLA_TAILWIND -> "a single-file functional HTML and Tailwind CSS string"
                     ExportFramework.BOOTSTRAP -> "a single-file functional HTML and Bootstrap 5 string"
@@ -185,8 +181,9 @@ class GenerativeViewModel(
                             "Make it responsive and look like a modern mobile/web application.")
                 }
                 
-                val response = chatSession?.sendMessage(prompt)
-                val htmlContent = response?.text?.trim() ?: ""
+                // Use generateContent for the initial image capture for better stability
+                val response = model.generateContent(prompt)
+                val htmlContent = response.text?.trim() ?: ""
                 val cleanedHtml = cleanHtml(htmlContent)
                 
                 if (cleanedHtml.isEmpty()) {
@@ -195,6 +192,9 @@ class GenerativeViewModel(
                     _uiState.value = UiState.Success(cleanedHtml)
                     _codeHistory.value = listOf(cleanedHtml)
                     _redoStack.value = emptyList()
+                    
+                    // Initialize chat session for future refinements
+                    chatSession = model.startChat()
                     
                     val namePrompt = "Briefly describe what this UI is in 3 to 5 words to use as a project title. Output ONLY the title, no extra text."
                     val nameResponse = chatSession?.sendMessage(namePrompt)
